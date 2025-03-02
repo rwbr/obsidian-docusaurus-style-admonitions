@@ -1,12 +1,17 @@
 import {
-	App, Modal, Notice, Plugin, PluginSettingTab, Setting,
-	MarkdownPostProcessor, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer,
-	editorLivePreviewField
+	App,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	MarkdownPostProcessorContext,
+	MarkdownRenderer
 } from 'obsidian';
+
 import { Decoration, DecorationSet } from '@codemirror/view';
 import { Range } from '@codemirror/state';
 import { ViewPlugin, EditorView } from '@codemirror/view';
 
+/** Plugin-Einstellungen */
 interface DocusaurusAdmonitionSettings {
 	enabledAdmonitions: {
 		note: boolean;
@@ -27,565 +32,466 @@ const DEFAULT_SETTINGS: DocusaurusAdmonitionSettings = {
 		danger: true
 	},
 	customCSS: true
-}
+};
 
 export default class DocusaurusAdmonitionsPlugin extends Plugin {
 	settings: DocusaurusAdmonitionSettings;
 
+	/** Wird aufgerufen, wenn das Plugin geladen wird. */
 	async onload() {
+		console.log('Docusaurus Admonitions Plugin geladen');
+
+		// 1. Plugin-Einstellungen laden
 		await this.loadSettings();
 
-		// CSS-Styles laden
-		this.loadStyles();
+		// 2. CSS-Styles einfügen
+		this.injectStyles();
 
-		// Markdown-Postprocessor für Admonitions registrieren
+		// 3. Code-Block-Processor für Reading Mode
 		this.registerMarkdownCodeBlockProcessor('note', this.processAdmonition.bind(this, 'note'));
 		this.registerMarkdownCodeBlockProcessor('tip', this.processAdmonition.bind(this, 'tip'));
 		this.registerMarkdownCodeBlockProcessor('info', this.processAdmonition.bind(this, 'info'));
 		this.registerMarkdownCodeBlockProcessor('warning', this.processAdmonition.bind(this, 'warning'));
 		this.registerMarkdownCodeBlockProcessor('danger', this.processAdmonition.bind(this, 'danger'));
 
-		// Custom Admonition Syntax (:::type) verarbeiten
+		// 4. Live Preview-Unterstützung (Edit Mode)
 		this.registerLivePreviewRenderer();
 
-		// Einstellungs-Tab hinzufügen
+		// 5. Einstellungs-Tab hinzufügen
 		this.addSettingTab(new DocusaurusAdmonitionsSettingTab(this.app, this));
 
-		// Debugging-Funktion für die Dokumentenstruktur hinzufügen
-		this.testDocumentStructure();
+		// Debugging-Funktion zur Verfügung stellen
+		(window as any).inspectDocusaurusAdmonitions = this.inspectAdmonitions;
+		console.log("Debug-Funktion verfügbar: window.inspectDocusaurusAdmonitions()");
+
+		// Nach 3 Sekunden automatisch inspizieren
+		setTimeout(() => {
+			console.log(this.inspectAdmonitions());
+		}, 3000);
 	}
 
-	loadStyles() {
-		// Bestehende Styles laden
-		document.head.appendChild(this.createAdmonitionStyles());
+	/** Erstellt & injiziert CSS-Styles für Reading Mode und Live Preview. */
+	injectStyles() {
+		// A) Reading Mode (fertige Admonitions)
+		const readingModeStyle = document.createElement('style');
+		readingModeStyle.id = 'docusaurus-admonitions-styles';
+		readingModeStyle.textContent = `
+    .docusaurus-admonition {
+        margin-bottom: 1em;
+        padding: 16px;
+        border-radius: 8px;
+        border-left: 0;
+        background-color: var(--background-secondary);
+        position: relative;
+        overflow: hidden;
+    }
 
-		// Verbesserte Editor-CSS für die Hervorhebung von Admonitions
-		const editorStyle = document.createElement('style');
-		editorStyle.id = 'docusaurus-admonitions-editor-styles';
-		editorStyle.textContent = `
-			/* Admonition-Block-Zeilen im Editor */
-			.admonition-note-start,
-			.admonition-tip-start,
-			.admonition-info-start,
-			.admonition-warning-start,
-			.admonition-danger-start {
-				font-weight: bold;
+    /* Farbige Seitenleiste für jeden Typ */
+    .docusaurus-admonition::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+    }
+
+    .docusaurus-admonition-note::before { background-color: #3578e5; }
+    .docusaurus-admonition-tip::before { background-color: #00a400; }
+    .docusaurus-admonition-info::before { background-color: #3578e5; }
+    .docusaurus-admonition-warning::before { background-color: #e6a700; }
+    .docusaurus-admonition-danger::before { background-color: #fa383e; }
+
+    /* Titel mit Icons und Farben */
+    .docusaurus-admonition-title {
+        margin-top: 0 !important;
+        margin-bottom: 14px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        font-size: 0.8em !important;
+        line-height: 1.5 !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Icons für jeden Admonition-Typ */
+    .docusaurus-admonition-title::before {
+        content: '' !important;
+        margin-right: 8px !important;
+        width: 20px !important;
+        height: 20px !important;
+        min-width: 20px !important;
+        display: inline-block !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        background-size: contain !important;
+    }
+
+    /* Icon für NOTE (Info Circle) */
+    .docusaurus-admonition-note .docusaurus-admonition-title {
+        color: #3578e5;
+    }
+    .docusaurus-admonition-note .docusaurus-admonition-title::before {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 512 512'%3E%3Cpath fill='%233578e5' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 128c17.67 0 32 14.33 32 32c0 17.67-14.33 32-32 32S224 177.7 224 160C224 142.3 238.3 128 256 128zM296 384h-80C202.8 384 192 373.3 192 360s10.75-24 24-24h16v-64H224c-13.25 0-24-10.75-24-24S210.8 224 224 224h32c13.25 0 24 10.75 24 24v88h16c13.25 0 24 10.75 24 24S309.3 384 296 384z'%3E%3C/path%3E%3C/svg%3E");
+    }
+
+    /* Icon für TIP (Lightbulb) */
+    .docusaurus-admonition-tip .docusaurus-admonition-title {
+        color: #00a400;
+    }
+    .docusaurus-admonition-tip .docusaurus-admonition-title::before {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512'%3E%3Cpath fill='%2300a400' d='M112.1 454.3c0 6.297 1.816 12.44 5.284 17.69l17.14 25.69c5.25 7.875 17.17 14.28 26.64 14.28h61.67c9.438 0 21.36-6.401 26.61-14.28l17.08-25.68c2.938-4.438 5.348-12.37 5.348-17.7L272 415.1h-160L112.1 454.3zM191.4 .0132C89.44 .3257 16 82.97 16 175.1c0 44.38 16.44 84.84 43.56 115.8c16.53 18.84 42.34 58.23 52.22 91.45c.0313 .25 .0938 .5166 .125 .7823h160.2c.0313-.2656 .0938-.5166 .125-.7823c9.875-33.22 35.69-72.61 52.22-91.45C351.6 260.8 368 220.4 368 175.1C368 78.61 288.9 .0132 191.4 .0132zM192 96.01c-44.13 0-80 35.89-80 79.1C112 184.8 104.8 192 96 192S80 184.8 80 176c0-61.76 50.25-111.1 112-111.1c8.844 0 16 7.159 16 16S200.8 96.01 192 96.01z'/%3E%3C/svg%3E");
+		}
+
+		/* Icon für INFO (Info Circle) - gleich wie NOTE */
+		.docusaurus-admonition-info .docusaurus-admonition-title {
+			color: #3578e5;
 			}
-			
-			.admonition-note-start {
-				color: #448aff !important;
-				border-left: 3px solid #448aff;
-				padding-left: 4px;
-			}
+			.docusaurus-admonition-info .docusaurus-admonition-title::before {
+background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 512 512'%3E%3Cpath fill='%233578e5' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 128c17.67 0 32 14.33 32 32c0 17.67-14.33 32-32 32S224 177.7 224 160C224 142.3 238.3 128 256 128zM296 384h-80C202.8 384 192 373.3 192 360s10.75-24 24-24h16v-64H224c-13.25 0-24-10.75-24-24S210.8 224 224 224h32c13.25 0 24 10.75 24 24v88h16c13.25 0 24 10.75 24 24S309.3 384 296 384z'%3E%3C/path%3E%3C/svg%3E");    }
 
-			.admonition-tip-start {
-				color: #00a400 !important;
-				border-left: 3px solid #00a400;
-				padding-left: 4px;
-			}
+    /* Icon für WARNING (Exclamation Triangle) */
+    .docusaurus-admonition-warning .docusaurus-admonition-title {
+        color: #e6a700;
+    }
+    .docusaurus-admonition-warning .docusaurus-admonition-title::before {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23e6a700' d='M506.3 417l-213.3-364c-16.33-28-57.54-28-73.98 0l-213.2 364C-10.59 444.9 9.849 480 42.74 480h426.6C502.1 480 522.6 445 506.3 417zM232 168c0-13.25 10.75-24 24-24S280 154.8 280 168v128c0 13.25-10.75 24-24 24S232 309.3 232 296V168zM256 416c-17.36 0-31.44-14.08-31.44-31.44c0-17.36 14.07-31.44 31.44-31.44s31.44 14.08 31.44 31.44C287.4 401.9 273.4 416 256 416z'/%3E%3C/svg%3E");
+    }
 
-			.admonition-info-start {
-				color: #3578e5 !important;
-				border-left: 3px solid #3578e5;
-				padding-left: 4px;
-			}
+    /* Icon für DANGER (Exclamation Circle) */
+    .docusaurus-admonition-danger .docusaurus-admonition-title {
+        color: #fa383e;
+    }
+    .docusaurus-admonition-danger .docusaurus-admonition-title::before {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23fa383e' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM232 152C232 138.8 242.8 128 256 128s24 10.75 24 24v128c0 13.25-10.75 24-24 24S232 293.3 232 280V152zM256 400c-17.36 0-31.44-14.08-31.44-31.44c0-17.36 14.07-31.44 31.44-31.44s31.44 14.08 31.44 31.44C287.4 385.9 273.4 400 256 400z'/%3E%3C/svg%3E");
+    }
 
-			.admonition-warning-start {
-				color: #e6a700 !important;
-				border-left: 3px solid #e6a700;
-				padding-left: 4px;
-			}
+    /* Inhalt-Styling */
+    .docusaurus-admonition-content p:last-child {
+        margin-bottom: 0;
+    }
+`;
+		document.head.appendChild(readingModeStyle);
 
-			.admonition-danger-start {
-				color: #fa383e !important;
-				border-left: 3px solid #fa383e;
-				padding-left: 4px;
-			}
-
-			.admonition-end {
-				color: #888 !important;
-				border-left: 3px solid #888;
-				padding-left: 4px;
-			}
-
-			/* Zeilen zwischen Start und Ende */
-			.cm-line:has(.admonition-note-start) ~ .cm-line:not(:has(.admonition-end)) {
-				border-left: 3px solid rgba(68, 138, 255, 0.2);
-				padding-left: 4px;
-				background-color: rgba(68, 138, 255, 0.05);
-			}
-		`;
-		document.head.appendChild(editorStyle);
-
-		// Weitere CSS-Einstellungen...
-
-		// Live-Preview-Styles hinzufügen
+		// B) Live Preview / Edit Mode
 		const livePreviewStyle = document.createElement('style');
-		livePreviewStyle.id = 'docusaurus-admonitions-live-styles';
+		livePreviewStyle.id = 'docusaurus-admonitions-editor-styles';
 		livePreviewStyle.textContent = `
-				.docusaurus-admonition-live {
-					background-color: var(--background-secondary);
-					border-left: 5px solid;
-					padding-left: 10px;
-				}
+    /* =============== Allgemeine Styles für Admonition-Zeilen =============== */
+    .admonition-note-start, .admonition-note-end, .admonition-note-content,
+    .admonition-tip-start, .admonition-tip-end, .admonition-tip-content,
+    .admonition-info-start, .admonition-info-end, .admonition-info-content,
+    .admonition-warning-start, .admonition-warning-end, .admonition-warning-content,
+    .admonition-danger-start, .admonition-danger-end, .admonition-danger-content {
+        padding-left: 12px;
+        position: relative;
+    }
 
-				.docusaurus-admonition-note-live {
-					border-left-color: #448aff !important;
-				}
+    /* =============== Linien an der Seite für jeden Typ =============== */
+    .admonition-note-start::before, .admonition-note-end::before, .admonition-note-content::before,
+    .admonition-tip-start::before, .admonition-tip-end::before, .admonition-tip-content::before,
+    .admonition-info-start::before, .admonition-info-end::before, .admonition-info-content::before,
+    .admonition-warning-start::before, .admonition-warning-end::before, .admonition-warning-content::before,
+    .admonition-danger-start::before, .admonition-danger-end::before, .admonition-danger-content::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 4px;
+    }
 
-				.docusaurus-admonition-tip-live {
-					border-left-color: #00a400 !important;
-				}
+    /* Note Style mit Icon */
+    .admonition-note-start, .admonition-note-end, .admonition-note-content {
+        background-color: rgba(53, 120, 229, 0.05);
+    }
+    .admonition-note-start::before, .admonition-note-end::before, .admonition-note-content::before {
+        background-color: #3578e5;
+    }
+	.admonition-note-start {
+		font-weight: bold;
+		color: #3578e5 !important;
+		padding-left: 32px !important; /* Mehr Platz für das Icon */
+		position: relative; /* Notwendig für die absolute Positionierung */
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='16' height='16'%3E%3Cpath fill='%233578e5' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 128c17.67 0 32 14.33 32 32c0 17.67-14.33 32-32 32S224 177.7 224 160C224 142.3 238.3 128 256 128zM296 384h-80C202.8 384 192 373.3 192 360s10.75-24 24-24h16v-64H224c-13.25 0-24-10.75-24-24S210.8 224 224 224h32c13.25 0 24 10.75 24 24v88h16c13.25 0 24 10.75 24 24S309.3 384 296 384z'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: 8px center;
+		background-size: 16px;
+	}
 
-				.docusaurus-admonition-info-live {
-					border-left-color: #3578e5 !important;
-				}
+	/* Entferne das alte ::after */
+	.admonition-note-start::after {
+		content: none;
+	}
 
-				.docusaurus-admonition-warning-live {
-					border-left-color: #e6a700 !important;
-				}
+    /* Tip Style mit Icon */
+    .admonition-tip-start, .admonition-tip-end, .admonition-tip-content {
+        background-color: rgba(0, 164, 0, 0.05);
+    }
+    .admonition-tip-start::before, .admonition-tip-end::before, .admonition-tip-content::before {
+        background-color: #00a400;
+    }
+	.admonition-tip-start {
+		font-weight: bold;
+		color: #00a400 !important;
+		padding-left: 32px !important; /* Mehr Platz für das Icon */
+		position: relative; /* Notwendig für die absolute Positionierung */
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512' width='16' height='16'%3E%3Cpath fill='%2300a400' d='M112.1 454.3c0 6.297 1.816 12.44 5.284 17.69l17.14 25.69c5.25 7.875 17.17 14.28 26.64 14.28h61.67c9.438 0 21.36-6.401 26.61-14.28l17.08-25.68c2.938-4.438 5.348-12.37 5.348-17.7L272 415.1h-160L112.1 454.3zM191.4 .0132C89.44 .3257 16 82.97 16 175.1c0 44.38 16.44 84.84 43.56 115.8c16.53 18.84 42.34 58.23 52.22 91.45c.0313 .25 .0938 .5166 .125 .7823h160.2c.0313-.2656 .0938-.5166 .125-.7823c9.875-33.22 35.69-72.61 52.22-91.45C351.6 260.8 368 220.4 368 175.1C368 78.61 288.9 .0132 191.4 .0132zM192 96.01c-44.13 0-80 35.89-80 79.1C112 184.8 104.8 192 96 192S80 184.8 80 176c0-61.76 50.25-111.1 112-111.1c8.844 0 16 7.159 16 16S200.8 96.01 192 96.01z'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: 8px center;
+		background-size: 16px;
+	}
 
-				.docusaurus-admonition-danger-live {
-					border-left-color: #fa383e !important;
-				}
-			`;
+	/* Entferne das alte ::after */
+	.admonition-tip-start::after {
+		content: none;
+	}
+
+    /* Info Style mit Icon */
+    .admonition-info-start, .admonition-info-end, .admonition-info-content {
+        background-color: rgba(53, 120, 229, 0.05);
+    }
+    .admonition-info-start::before, .admonition-info-end::before, .admonition-info-content::before {
+        background-color: #3578e5;
+    }
+	.admonition-info-start {
+		font-weight: bold;
+		color: #3578e5 !important;
+		padding-left: 32px !important; /* Mehr Platz für das Icon */
+		position: relative; /* Notwendig für die absolute Positionierung */
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='16' height='16'%3E%3Cpath fill='%233578e5' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 128c17.67 0 32 14.33 32 32c0 17.67-14.33 32-32 32S224 177.7 224 160C224 142.3 238.3 128 256 128zM296 384h-80C202.8 384 192 373.3 192 360s10.75-24 24-24h16v-64H224c-13.25 0-24-10.75-24-24S210.8 224 224 224h32c13.25 0 24 10.75 24 24v88h16c13.25 0 24 10.75 24 24S309.3 384 296 384z'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: 8px center;
+		background-size: 16px;
+	}
+
+	/* Entferne das alte ::after */
+	.admonition-info-start::after {
+		content: none;
+	}
+
+    /* Warning Style mit Icon */
+    .admonition-warning-start, .admonition-warning-end, .admonition-warning-content {
+        background-color: rgba(230, 167, 0, 0.05);
+    }
+    .admonition-warning-start::before, .admonition-warning-end::before, .admonition-warning-content::before {
+        background-color: #e6a700;
+    }
+	.admonition-warning-start {
+		font-weight: bold;
+		color: #e6a700 !important;
+		padding-left: 32px !important; /* Mehr Platz für das Icon */
+		position: relative; /* Notwendig für die absolute Positionierung */
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='16' height='16'%3E%3Cpath fill='%23e6a700' d='M506.3 417l-213.3-364c-16.33-28-57.54-28-73.98 0l-213.2 364C-10.59 444.9 9.849 480 42.74 480h426.6C502.1 480 522.6 445 506.3 417zM232 168c0-13.25 10.75-24 24-24S280 154.8 280 168v128c0 13.25-10.75 24-24 24S232 309.3 232 296V168zM256 416c-17.36 0-31.44-14.08-31.44-31.44c0-17.36 14.07-31.44 31.44-31.44s31.44 14.08 31.44 31.44C287.4 401.9 273.4 416 256 416z'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: 8px center;
+		background-size: 16px;
+	}
+
+	/* Entferne das alte ::after */
+	.admonition-warning-start::after {
+		content: none;
+	}
+
+    /* Danger Style mit Icon */
+    .admonition-danger-start, .admonition-danger-end, .admonition-danger-content {
+        background-color: rgba(250, 56, 62, 0.05);
+    }
+    .admonition-danger-start::before, .admonition-danger-end::before, .admonition-danger-content::before {
+        background-color: #fa383e;
+    }
+	.admonition-danger-start {
+		font-weight: bold;
+		color: #fa383e !important;
+		padding-left: 32px !important; /* Mehr Platz für das Icon */
+		position: relative; /* Notwendig für die absolute Positionierung */
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='16' height='16'%3E%3Cpath fill='%23fa383e' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM232 152C232 138.8 242.8 128 256 128s24 10.75 24 24v128c0 13.25-10.75 24-24 24S232 293.3 232 280V152zM256 400c-17.36 0-31.44-14.08-31.44-31.44c0-17.36 14.07-31.44 31.44-31.44s31.44 14.08 31.44 31.44C287.4 385.9 273.4 400 256 400z'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: 8px center;
+		background-size: 16px;
+	}
+
+	/* Entferne das alte ::after */
+	.admonition-danger-start::after {
+		content: none;
+	}`;
 		document.head.appendChild(livePreviewStyle);
 
-		// Verbesserte Live Preview-Styles
-		const livePreviewStyleImproved = document.createElement('style');
-		livePreviewStyleImproved.id = 'docusaurus-admonitions-live-styles';
-		livePreviewStyleImproved.textContent = `
-        /* Allgemeine Stile für Admonition-Live-Blöcke */
-        .docusaurus-admonition-live {
-            border-left: 4px solid;
-            background-color: var(--background-secondary-alt);
-            padding-left: 8px;
-            margin-left: 4px;
-        }
-        
-        /* Spezifische Stile für jeden Admonition-Typ */
-        /* Note */
-        .admonition-note-start,
-        .admonition-note-content,
-        .admonition-note-end {
-            border-left-color: #448aff !important;
-            background-color: rgba(68, 138, 255, 0.05);
-        }
-        .admonition-note-start {
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-            font-weight: bold;
-            color: #448aff;
-        }
-        .admonition-note-end {
-            border-bottom-left-radius: 4px;
-            border-bottom-right-radius: 4px;
-            color: #448aff;
-        }
-        
-        /* Tip */
-        .admonition-tip-start,
-        .admonition-tip-content,
-        .admonition-tip-end {
-            border-left-color: #00a400 !important;
-            background-color: rgba(0, 164, 0, 0.05);
-        }
-        .admonition-tip-start {
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-            font-weight: bold;
-            color: #00a400;
-        }
-        .admonition-tip-end {
-            border-bottom-left-radius: 4px;
-            border-bottom-right-radius: 4px;
-            color: #00a400;
-        }
-        
-        /* Info */
-        .admonition-info-start,
-        .admonition-info-content,
-        .admonition-info-end {
-            border-left-color: #3578e5 !important;
-            background-color: rgba(53, 120, 229, 0.05);
-        }
-        .admonition-info-start {
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-            font-weight: bold;
-            color: #3578e5;
-        }
-        .admonition-info-end {
-            border-bottom-left-radius: 4px;
-            border-bottom-right-radius: 4px;
-            color: #3578e5;
-        }
-        
-        /* Warning */
-        .admonition-warning-start,
-        .admonition-warning-content,
-        .admonition-warning-end {
-            border-left-color: #e6a700 !important;
-            background-color: rgba(230, 167, 0, 0.05);
-        }
-        .admonition-warning-start {
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-            font-weight: bold;
-            color: #e6a700;
-        }
-        .admonition-warning-end {
-            border-bottom-left-radius: 4px;
-            border-bottom-right-radius: 4px;
-            color: #e6a700;
-        }
-        
-        /* Danger */
-        .admonition-danger-start,
-        .admonition-danger-content,
-        .admonition-danger-end {
-            border-left-color: #fa383e !important;
-            background-color: rgba(250, 56, 62, 0.05);
-        }
-        .admonition-danger-start {
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-            font-weight: bold;
-            color: #fa383e;
-        }
-        .admonition-danger-end {
-            border-bottom-left-radius: 4px;
-            border-bottom-right-radius: 4px;
-            color: #fa383e;
-        }
-    `;
-		document.head.appendChild(livePreviewStyleImproved);
+		console.log("Docusaurus Admonitions: Styles injected.");
 	}
 
-	createAdmonitionStyles(): HTMLElement {
-		const styleEl = document.createElement('style');
-		styleEl.id = 'docusaurus-admonitions-styles';
-		styleEl.textContent = `
-            .docusaurus-admonition {
-                margin-bottom: 1em;
-                padding: 15px;
-                border-left: 5px solid;
-                border-radius: 5px;
-                background-color: var(--background-secondary);
-            }
-            
-            .docusaurus-admonition-note {
-                border-left-color: #448aff;
-            }
-            
-            .docusaurus-admonition-tip {
-                border-left-color: #00a400;
-            }
-            
-            .docusaurus-admonition-info {
-                border-left-color: #3578e5;
-            }
-            
-            .docusaurus-admonition-warning {
-                border-left-color: #e6a700;
-            }
-            
-            .docusaurus-admonition-danger {
-                border-left-color: #fa383e;
-            }
-            
-            .docusaurus-admonition-title {
-                margin-top: 0;
-                margin-bottom: 10px;
-                font-weight: 700;
-                text-transform: uppercase;
-                font-size: 0.9em;
-            }
-            
-            .docusaurus-admonition-content p:last-child {
-                margin-bottom: 0;
-            }
-        `;
-		return styleEl;
-	}
-
+	/** Verarbeitet Code-Blöcke (z. B. ```note ... ```), um Reading Mode-Admonitions zu erzeugen. */
 	async processAdmonition(type: string, source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-		// Prüfe ob dieser Admonition-Typ aktiviert ist
 		if (!this.settings.enabledAdmonitions[type as keyof typeof this.settings.enabledAdmonitions]) {
 			return;
 		}
 
-		// Container für die Admonition erstellen
+		// Gesamten Container leeren und neu erstellen
+		el.empty();
+
 		const admonitionDiv = el.createDiv({
 			cls: ['docusaurus-admonition', `docusaurus-admonition-${type}`]
 		});
 
-		// Titel hinzufügen
-		admonitionDiv.createDiv({
-			cls: 'docusaurus-admonition-title',
-			text: type.toUpperCase()
+		// Titel OHNE text-Option erstellen, damit wir HTML verwenden können
+		const titleDiv = admonitionDiv.createDiv({
+			cls: 'docusaurus-admonition-title'
 		});
 
-		// Inhalt-Container erstellen
+		// Text manuell setzen (kein HTML-Escaping)
+		titleDiv.textContent = type.toUpperCase();
+
+		console.log(`Admonition erstellt: ${type}`, {
+			'Hat Titel?': admonitionDiv.querySelector('.docusaurus-admonition-title') !== null,
+			'Elternelement': el.parentElement?.tagName,
+			'CSS geladen?': document.getElementById('docusaurus-admonitions-styles') !== null
+		});
+
 		const contentDiv = admonitionDiv.createDiv({
 			cls: 'docusaurus-admonition-content'
 		});
 
-		// Markdown im Inhalt verarbeiten lassen
-		await MarkdownRenderer.render(this.app, source, contentDiv, ctx.sourcePath, this);
+		await MarkdownRenderer.renderMarkdown(source, contentDiv, ctx.sourcePath, this);
 	}
 
+	/** Verarbeitet die :::type-Syntax in Reading Mode. */
 	async processCustomAdmonitionSyntax(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-		console.log("--- Beginn der Verarbeitung: processCustomAdmonitionSyntax ---");
-		console.log("Context:", ctx.sourcePath);
+		const paragraphs = el.querySelectorAll('p');
 
-		// Suche nach Zeilen mit :::type Syntax
-		const contentElements = el.querySelectorAll('p');
-		console.log(`Gefundene Paragraphen: ${contentElements.length}`);
+		for (let i = 0; i < paragraphs.length; i++) {
+			const p = paragraphs[i];
+			const text = p.textContent?.trim();
+			if (!text || !text.startsWith(':::')) continue;
 
-		for (let i = 0; i < contentElements.length; i++) {
-			const element = contentElements[i];
-			const text = element.textContent?.trim();
-			console.log(`Paragraph ${i}: "${text}"`);
-
-			if (!text || !text.startsWith(':::')) {
-				console.log('  Nicht mit ::: beginnend - überspringen');
-				continue;
-			}
-
-			// Prüfe, ob es ein Admonition-Start ist
+			// Typ ermitteln
 			const match = text.match(/^:::(note|tip|info|warning|danger)(?:\s|$)/);
-			if (!match) {
-				console.log('  Kein gültiger Admonition-Start - überspringen');
+			if (!match) continue;
+			const type = match[1];
+
+			// Einzeilige Admonition
+			const singleLineMatch = text.match(/^:::(note|tip|info|warning|danger)\s+([\s\S]+?)\s+:::$/);
+			if (singleLineMatch) {
+				const singleType = singleLineMatch[1];
+				const content = singleLineMatch[2];
+
+				if (!this.settings.enabledAdmonitions[singleType as keyof typeof this.settings.enabledAdmonitions]) {
+					continue;
+				}
+
+				const admonitionDiv = el.createDiv({
+					cls: ['docusaurus-admonition', `docusaurus-admonition-${singleType}`]
+				});
+				admonitionDiv.createDiv({
+					cls: 'docusaurus-admonition-title',
+					text: singleType.toUpperCase()
+				});
+				const contentDiv = admonitionDiv.createDiv({ cls: 'docusaurus-admonition-content' });
+				await MarkdownRenderer.renderMarkdown(content, contentDiv, ctx.sourcePath, this);
+				p.replaceWith(admonitionDiv);
 				continue;
 			}
 
-			console.log(`  Admonition gefunden! Typ: ${match[1]}`);
+			// Mehrzeilige Admonition
+			let endIndex = -1;
+			let content: HTMLElement[] = [];
+			for (let j = i + 1; j < paragraphs.length; j++) {
+				const endText = paragraphs[j].textContent?.trim();
+				if (endText === ':::') {
+					endIndex = j;
+					break;
+				} else {
+					content.push(paragraphs[j]);
+				}
+			}
+			if (endIndex === -1) continue;
 
-			// Prüfe, ob dieser Typ aktiviert ist
-			const type = match[1];
 			if (!this.settings.enabledAdmonitions[type as keyof typeof this.settings.enabledAdmonitions]) {
 				continue;
 			}
 
-			// Prüfe auf einzeilige Admonition wie ":::info\nInhalt\n:::"
-			const singleLineMatch = text.match(/^:::(note|tip|info|warning|danger)\s+([\s\S]+?)\s+:::$/);
-			if (singleLineMatch) {
-				console.log(`  Einzeilige Admonition gefunden! Typ: ${singleLineMatch[1]}, Inhalt: ${singleLineMatch[2]}`);
-
-				const type = singleLineMatch[1];
-				const content = singleLineMatch[2];
-
-				// Erstelle die Admonition
-				const admonitionDiv = el.createDiv({
-					cls: ['docusaurus-admonition', `docusaurus-admonition-${type}`]
-				});
-
-				// Titel hinzufügen
-				admonitionDiv.createDiv({
-					cls: 'docusaurus-admonition-title',
-					text: type.toUpperCase()
-				});
-
-				// Inhalt-Container erstellen
-				const contentDiv = admonitionDiv.createDiv({
-					cls: 'docusaurus-admonition-content'
-				});
-
-				// Markdown-Inhalt rendern
-				await MarkdownRenderer.renderMarkdown(content, contentDiv, ctx.sourcePath, this);
-
-				// Original-Element ersetzen
-				element.replaceWith(admonitionDiv);
-				return; // Beende die Verarbeitung hier
-			}
-
-			// Suche nach dem Ende des Blocks (nur ":::")
-			let endIndex = -1;
-			let content = [];
-
-			for (let j = i + 1; j < contentElements.length; j++) {
-				const possibleEndElement = contentElements[j];
-				if (possibleEndElement.textContent?.trim() === ':::') {
-					endIndex = j;
-					break;
-				} else {
-					content.push(possibleEndElement);
-				}
-			}
-
-			if (endIndex === -1) {
-				console.log(`  Kein Ende-Tag für ${type} Admonition gefunden - überspringen`);
-				continue; // Kein Ende gefunden
-			}
-
-			// Container für die Admonition erstellen
+			// Container bauen
 			const admonitionDiv = el.createDiv({
 				cls: ['docusaurus-admonition', `docusaurus-admonition-${type}`]
 			});
-
-			// Titel hinzufügen
 			admonitionDiv.createDiv({
 				cls: 'docusaurus-admonition-title',
 				text: type.toUpperCase()
 			});
+			const contentDiv = admonitionDiv.createDiv({ cls: 'docusaurus-admonition-content' });
 
-			// Inhalt-Container erstellen
-			const contentDiv = admonitionDiv.createDiv({
-				cls: 'docusaurus-admonition-content'
-			});
+			for (let k = 0; k < content.length; k++) {
+				contentDiv.appendChild(content[k].cloneNode(true));
+			}
 
-			// Inhalte zum Content-Div hinzufügen
-			content.forEach(el => {
-				contentDiv.appendChild(el.cloneNode(true));
-			});
-
-			// Original-Elemente ersetzen/entfernen
-			element.replaceWith(admonitionDiv);
-
-			// Entferne alle Inhalts- und End-Elemente
+			p.replaceWith(admonitionDiv);
 			content.forEach(el => el.remove());
-			contentElements[endIndex].remove();
-
-			// Anpassen des Index für die nächste Iteration
+			paragraphs[endIndex].remove();
 			i = endIndex;
 		}
-		console.log("--- Ende der Verarbeitung: processCustomAdmonitionSyntax ---");
 	}
 
+	/** Registriert Post-Processor & CodeMirror-Dekorationen für Live Preview. */
 	registerLivePreviewRenderer() {
-		// Reading View-Postprozessor bleibt erhalten
+		// A) Reading Mode: Processors
 		this.registerMarkdownPostProcessor((el, ctx) => {
 			this.processCustomAdmonitionSyntax(el, ctx);
 		});
 
-		// Live Preview Support über ViewPlugin als Editor-Erweiterung
+		// B) Live Preview (Edit Mode) via EditorView Plugin
 		try {
-			const admonitionExtension = createAdmonitionViewPlugin(this);
-			this.registerEditorExtension([admonitionExtension]);
-			console.log("Live Preview-Unterstützung wurde aktiviert");
+			const pluginExtension = createAdmonitionViewPlugin();
+			this.registerEditorExtension([pluginExtension]);
+			console.log("Docusaurus Admonitions: Live Preview aktiviert.");
 		} catch (e) {
-			console.error("Live Preview-Unterstützung konnte nicht aktiviert werden:", e);
-			this.addCSS_LivePreviewStyles();
+			console.error("Docusaurus Admonitions: Live Preview konnte nicht aktiviert werden:", e);
+			this.addCSS_Fallback();
 		}
 	}
 
-	// Fallback zu CSS-basierter Hervorhebung
-	addCSS_LivePreviewStyles() {
-		const cssElem = document.createElement('style');
-		cssElem.id = 'docusaurus-fallback-live-styles';
-		cssElem.textContent = `
-        /* Fallback CSS für Admonition-Start-Zeilen */
-        .cm-line:has(.cm-string:contains(':::note')) {
-            color: #448aff;
-            font-weight: bold;
-            background-color: rgba(68, 138, 255, 0.05);
-            border-left: 4px solid #448aff;
-            padding-left: 8px;
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-        }
-
-        /* Styling für Zeilen innerhalb eines Admonition-Blocks */
-        .cm-line:has(.cm-string:contains(':::note')) ~ .cm-line:not(.cm-line:has(.cm-string:contains(':::'))) {
-            background-color: rgba(68, 138, 255, 0.05);
-            border-left: 4px solid #448aff;
-            padding-left: 8px;
-        }
-
-        /* Ende-Zeile stylen */
-        .cm-line:has(.cm-string:contains(':::note')) ~ .cm-line:has(.cm-string:contains(':::'):not(:contains(':::note'))) {
-            color: #448aff;
-            background-color: rgba(68, 138, 255, 0.05);
-            border-left: 4px solid #448aff;
-            padding-left: 8px;
-            border-bottom-left-radius: 4px;
-            border-bottom-right-radius: 4px;
-        }
-
-        /* Gleiche Stile für die anderen Admonition-Typen... */
-    `;
-		document.head.appendChild(cssElem);
-		console.log("Fallback CSS-Styles für Live Preview wurden hinzugefügt");
-	}
-
-	// Renderer-Funktion für Live Preview korrigieren
-	createAdmonitionRenderer(view) {
-		try {
-			// Admonition-Typen
-			const types = ['note', 'tip', 'info', 'warning', 'danger'];
-			const decorations = [];
-
-			// Dokumententext analysieren
-			const viewport = view.viewport || { from: 0, to: view.state.doc.length };
-
-			// Zeilen im sichtbaren Bereich durchgehen
-			let pos = viewport.from;
-			while (pos <= viewport.to) {
-				// Aktuelle Zeile
-				const line = view.state.doc.lineAt(pos);
-				const text = line.text;
-
-				// Prüfen auf Admonition-Start
-				for (const type of types) {
-					const admonitionStart = new RegExp(`^:::${type}(?:\\s|$)`);
-					if (admonitionStart.test(text)) {
-						// Dekoration erstellen
-						const decoration = Decoration.line({
-							attributes: { class: `admonition-${type}-start` }
-						});
-						decorations.push(decoration.range(line.from));
-						break;
-					}
-				}
-
-				// Prüfen auf Admonition-Ende
-				if (text.trim() === ":::") {
-					const decoration = Decoration.line({
-						attributes: { class: "admonition-end" }
-					});
-					decorations.push(decoration.range(line.from));
-				}
-
-				// Zur nächsten Zeile
-				pos = line.to + 1;
+	/** Fallback: Einfaches CSS, falls das ViewPlugin scheitert */
+	addCSS_Fallback() {
+		const fallbackStyles = document.createElement('style');
+		fallbackStyles.id = 'docusaurus-admonitions-fallback-styles';
+		fallbackStyles.textContent = `
+			/* Minimaler Fallback: Hebt nur Zeilen mit :::note etc. farbig hervor. */
+			.cm-line:has(.cm-string:contains(':::note')) {
+				color: #448aff;
+				border-left: 3px solid #448aff;
+				font-weight: bold;
 			}
-
-			// Dekorationen als DecorationSet zurückgeben
-			return Decoration.set(decorations, true);
-
-		} catch (error) {
-			console.error("Fehler beim Erstellen der Admonition-Dekorationen:", error);
-			return Decoration.none; // Leeres Decoration-Set bei Fehler
-		}
+			/* Weitere Admonition-Typen analog... */
+		`;
+		document.head.appendChild(fallbackStyles);
+		console.log("Docusaurus Admonitions: Fallback-CSS hinzugefügt.");
 	}
 
+	/** Beim Deaktivieren: CSS & Debug-Elemente entfernen. */
 	onunload() {
-		// CSS entfernen
-		['docusaurus-admonitions-styles', 'docusaurus-admonitions-editor-styles',
-			'docusaurus-admonitions-live-styles', 'docusaurus-fallback-live-styles'].forEach(id => {
-				const elem = document.getElementById(id);
-				if (elem) elem.remove();
-			});
-
-		// Debug-Button entfernen
-		const debugBtn = document.querySelector('button[style*="position: fixed"]');
-		if (debugBtn) debugBtn.remove();
-
-		console.log('Docusaurus Admonitions Plugin wurde deaktiviert');
+		const styleIds = [
+			'docusaurus-admonitions-styles',
+			'docusaurus-admonitions-editor-styles',
+			'docusaurus-admonitions-fallback-styles'
+		];
+		styleIds.forEach(id => {
+			const el = document.getElementById(id);
+			if (el) el.remove();
+		});
+		console.log('Docusaurus Admonitions: Plugin entladen.');
 	}
 
+	/** Einstellungen laden */
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
 
+	/** Einstellungen speichern */
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
 
-	// Debugging-Funktion für die Dokumentenstruktur
+	/** Debugging-Funktion für dein Dokument */
 	testDocumentStructure() {
-		// Temporärer Button in der Obsidian-UI hinzufügen
+		// Temporärer Button in der Obsidian-UI
 		const debugBtn = document.createElement('button');
 		debugBtn.textContent = 'DEBUG';
 		debugBtn.style.position = 'fixed';
@@ -603,7 +509,6 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 				const previewEl = view.containerEl.querySelector('.markdown-preview-view');
 				if (previewEl) {
 					console.log(previewEl.innerHTML);
-					console.log("Paragraphen im Dokument:");
 					const paragraphs = previewEl.querySelectorAll('p');
 					paragraphs.forEach((p, i) => {
 						console.log(`P[${i}]: "${p.textContent}"`);
@@ -614,9 +519,32 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 
 		document.body.appendChild(debugBtn);
 	}
+
+	inspectAdmonitions() {
+		// Suche im gesamten Dokument nach Admonitions und protokolliere deren Struktur
+		const admonitions = document.querySelectorAll('.docusaurus-admonition');
+		console.log(`${admonitions.length} Admonitions gefunden`);
+
+		admonitions.forEach((adm, i) => {
+			const type = Array.from(adm.classList)
+				.find(c => c.startsWith('docusaurus-admonition-') && c !== 'docusaurus-admonition')
+				?.replace('docusaurus-admonition-', '') || 'unbekannt';
+
+			console.log(`Admonition #${i} (${type}):`);
+			console.log('- HTML:', adm.outerHTML);
+			console.log('- Titel vorhanden:', adm.querySelector('.docusaurus-admonition-title') !== null);
+			console.log('- Computed Style für Titel:',
+				window.getComputedStyle(
+					adm.querySelector('.docusaurus-admonition-title') || adm
+				)
+			);
+		});
+
+		return `${admonitions.length} Admonitions inspiziert`;
+	}
 }
 
-
+/** Einstellungs-Tab */
 class DocusaurusAdmonitionsSettingTab extends PluginSettingTab {
 	plugin: DocusaurusAdmonitionsPlugin;
 
@@ -627,89 +555,39 @@ class DocusaurusAdmonitionsSettingTab extends PluginSettingTab {
 
 	display(): void {
 		const { containerEl } = this;
-
 		containerEl.empty();
 
 		containerEl.createEl('h2', { text: 'Docusaurus Admonitions Einstellungen' });
 
-		// Admonition-Typen aktivieren/deaktivieren
-		new Setting(containerEl)
-			.setName('Note Admonition')
-			.setDesc('Aktiviert die :::note Admonition')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.enabledAdmonitions.note)
-				.onChange(async (value) => {
-					this.plugin.settings.enabledAdmonitions.note = value;
-					await this.plugin.saveSettings();
-				}));
+		const desc = 'Aktiviert die :::SYNTAX Admonition';
+		const types = ['note', 'tip', 'info', 'warning', 'danger'] as const;
 
-		new Setting(containerEl)
-			.setName('Tip Admonition')
-			.setDesc('Aktiviert die :::tip Admonition')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.enabledAdmonitions.tip)
-				.onChange(async (value) => {
-					this.plugin.settings.enabledAdmonitions.tip = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Info Admonition')
-			.setDesc('Aktiviert die :::info Admonition')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.enabledAdmonitions.info)
-				.onChange(async (value) => {
-					this.plugin.settings.enabledAdmonitions.info = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Warning Admonition')
-			.setDesc('Aktiviert die :::warning Admonition')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.enabledAdmonitions.warning)
-				.onChange(async (value) => {
-					this.plugin.settings.enabledAdmonitions.warning = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Danger Admonition')
-			.setDesc('Aktiviert die :::danger Admonition')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.enabledAdmonitions.danger)
-				.onChange(async (value) => {
-					this.plugin.settings.enabledAdmonitions.danger = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Eigenes CSS')
-			.setDesc('Verwendet angepasstes CSS für Admonitions')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.customCSS)
-				.onChange(async (value) => {
-					this.plugin.settings.customCSS = value;
-					await this.plugin.saveSettings();
-					// CSS neu laden
-					const oldStyle = document.getElementById('docusaurus-admonitions-styles');
-					if (oldStyle) oldStyle.remove();
-					if (value) {
-						document.head.appendChild(this.plugin.createAdmonitionStyles());
-					}
-				}));
+		types.forEach(type => {
+			new Setting(containerEl)
+				.setName(`${type.toUpperCase()} Admonition`)
+				.setDesc(`${desc.replace('SYNTAX', type)}`)
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.enabledAdmonitions[type])
+					.onChange(async (value) => {
+						this.plugin.settings.enabledAdmonitions[type] = value;
+						await this.plugin.saveSettings();
+					})
+				);
+		});
 	}
 }
 
-function createAdmonitionViewPlugin(plugin: DocusaurusAdmonitionsPlugin) {
+/** ViewPlugin: Dekoriert die :::-Zeilen im Edit Mode (Live Preview). */
+function createAdmonitionViewPlugin() {
 	return ViewPlugin.fromClass(
 		class {
 			decorations: DecorationSet;
+
 			constructor(view: EditorView) {
 				this.decorations = computeAdmonitionDecorations(view);
 			}
+
 			update(update: any) {
-				// Bei Änderungen Decorate neu berechnen
 				if (update.docChanged || update.viewportChanged) {
 					this.decorations = computeAdmonitionDecorations(update.view);
 				}
@@ -721,76 +599,58 @@ function createAdmonitionViewPlugin(plugin: DocusaurusAdmonitionsPlugin) {
 	);
 }
 
+/** Erzeugt ein DecorationSet, das Start-/Endzeilen und Inhalt im Edit Mode hervorhebt. */
 function computeAdmonitionDecorations(view: EditorView): DecorationSet {
 	const types = ['note', 'tip', 'info', 'warning', 'danger'];
 	const decorations: Range<Decoration>[] = [];
-
 	const doc = view.state.doc;
-	const viewport = view.viewport || { from: 0, to: doc.length };
 
-	// Admonition-Block-Tracking
-	let currentType = null;
-	let blockStart = -1;
-
-	let pos = viewport.from;
-	while (pos <= viewport.to) {
+	let pos = 0;
+	while (pos < doc.length) {
 		const line = doc.lineAt(pos);
 		const text = line.text;
 
-		// Prüfe auf Admonition-Start
+		// Prüfe auf Admonition-Start (z.B. :::note)
 		let foundStart = false;
-		if (!currentType) {
-			for (const type of types) {
-				const startRegex = new RegExp(`^:::${type}(?:\\s|$)`);
-				if (startRegex.test(text)) {
-					currentType = type;
-					blockStart = line.from;
-					foundStart = true;
+		for (const t of types) {
+			const startRegex = new RegExp(`^:::${t}(?:\\s|$)`);
+			if (startRegex.test(text)) {
+				// Start-Zeile
+				decorations.push(
+					Decoration.line({
+						attributes: { class: `admonition-${t}-start` }
+					}).range(line.from)
+				);
+				foundStart = true;
 
-					// Spezielle Klasse für die Start-Zeile
-					decorations.push(
-						Decoration.line({
-							attributes: {
-								class: `docusaurus-admonition-live admonition-${type}-start`
-							}
-						}).range(line.from)
-					);
-					break;
+				// => Ab jetzt: alle folgenden Zeilen (Inhalt) stylen, bis wir ":::"
+				let innerPos = line.to + 1;
+				while (innerPos < doc.length) {
+					const innerLine = doc.lineAt(innerPos);
+					const innerText = innerLine.text.trim();
+
+					// Ende-Zeile?
+					if (innerText === ':::') {
+						decorations.push(
+							Decoration.line({
+								attributes: { class: `admonition-${t}-end` }
+							}).range(innerLine.from)
+						);
+						break;
+					} else {
+						// Inhalt
+						decorations.push(
+							Decoration.line({
+								attributes: { class: `admonition-${t}-content` }
+							}).range(innerLine.from)
+						);
+					}
+					innerPos = innerLine.to + 1;
 				}
+				break;
 			}
 		}
-
-		// Innerhalb eines Admonition-Blocks
-		if (currentType && !foundStart && text.trim() !== ":::") {
-			// Inhalt-Zeilen mit dem gleichen Stil wie der Typ
-			decorations.push(
-				Decoration.line({
-					attributes: {
-						class: `docusaurus-admonition-live admonition-${currentType}-content`
-					}
-				}).range(line.from)
-			);
-		}
-
-		// Prüfe auf Admonition-Ende
-		if (currentType && text.trim() === ":::") {
-		// Ende-Zeile mit dem gleichen Stil wie der Typ
-			decorations.push(
-				Decoration.line({
-					attributes: {
-						class: `docusaurus-admonition-live admonition-${currentType}-end`
-					}
-				}).range(line.from)
-			);
-
-			// Block-Tracking zurücksetzen
-			currentType = null;
-			blockStart = -1;
-		}
-
 		pos = line.to + 1;
 	}
-
 	return Decoration.set(decorations, true);
 }
-
