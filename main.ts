@@ -4,7 +4,8 @@ import {
 	PluginSettingTab,
 	Setting,
 	MarkdownPostProcessorContext,
-	MarkdownRenderer
+	MarkdownRenderer,
+	Notice
 } from 'obsidian';
 
 import { Decoration, DecorationSet } from '@codemirror/view';
@@ -21,6 +22,7 @@ interface DocusaurusAdmonitionSettings {
 		danger: boolean;
 	};
 	customCSS: boolean;
+	enableCodeBlockSyntax: boolean; // Neue Option für die Code-Block-Syntax
 }
 
 const DEFAULT_SETTINGS: DocusaurusAdmonitionSettings = {
@@ -31,7 +33,8 @@ const DEFAULT_SETTINGS: DocusaurusAdmonitionSettings = {
 		warning: true,
 		danger: true
 	},
-	customCSS: true
+	customCSS: true,
+	enableCodeBlockSyntax: false // Standardmäßig deaktiviert
 };
 
 export default class DocusaurusAdmonitionsPlugin extends Plugin {
@@ -47,12 +50,14 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 		// 2. CSS-Styles einfügen
 		this.injectStyles();
 
-		// 3. Code-Block-Processor für Reading Mode
-		this.registerMarkdownCodeBlockProcessor('note', this.processAdmonition.bind(this, 'note'));
-		this.registerMarkdownCodeBlockProcessor('tip', this.processAdmonition.bind(this, 'tip'));
-		this.registerMarkdownCodeBlockProcessor('info', this.processAdmonition.bind(this, 'info'));
-		this.registerMarkdownCodeBlockProcessor('warning', this.processAdmonition.bind(this, 'warning'));
-		this.registerMarkdownCodeBlockProcessor('danger', this.processAdmonition.bind(this, 'danger'));
+		// 3. Code-Block-Processor für Reading Mode (nur wenn aktiviert)
+		if (this.settings.enableCodeBlockSyntax) {
+			this.registerMarkdownCodeBlockProcessor('note', this.processAdmonition.bind(this, 'note'));
+			this.registerMarkdownCodeBlockProcessor('tip', this.processAdmonition.bind(this, 'tip'));
+			this.registerMarkdownCodeBlockProcessor('info', this.processAdmonition.bind(this, 'info'));
+			this.registerMarkdownCodeBlockProcessor('warning', this.processAdmonition.bind(this, 'warning'));
+			this.registerMarkdownCodeBlockProcessor('danger', this.processAdmonition.bind(this, 'danger'));
+		}
 
 		// 4. Live Preview-Unterstützung (Edit Mode)
 		this.registerLivePreviewRenderer();
@@ -574,6 +579,21 @@ class DocusaurusAdmonitionsSettingTab extends PluginSettingTab {
 					})
 				);
 		});
+
+		containerEl.createEl('h3', { text: 'Syntax-Optionen' });
+
+		new Setting(containerEl)
+			.setName('Code-Block-Syntax aktivieren')
+			.setDesc('Ermöglicht die Verwendung von ```note Code-Blöcken für Admonitions. Diese Syntax ist nicht Docusaurus-kompatibel.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableCodeBlockSyntax)
+				.onChange(async (value) => {
+					this.plugin.settings.enableCodeBlockSyntax = value;
+					await this.plugin.saveSettings();
+					// Hinweis anzeigen, dass Neustart erforderlich ist
+					new Notice('Bitte Obsidian neu starten, um die Syntax-Änderung wirksam zu machen.');
+				})
+			);
 	}
 }
 
