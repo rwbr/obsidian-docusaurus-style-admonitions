@@ -1,9 +1,9 @@
 {
-	"id": "obsidian-docusaurus-style-admonitions-plugin",
-	"name": "Obsidian Docusaurus Style Admonitions Plugin",
+	"id": "docusaurus-style-admonitions",
+	"name": "Docusaurus Style Admonitions",
 	"version": "0.1.0",
 	"minAppVersion": "1.4.0",
-	"description": "Adds Docusaurus style admonitions to Obsidian",
+	"description": "Adds Docusaurus style admonitions",
 	"repositoryUrl": "https://github.com/rwbr/obsidian-docusaurus-style-admonitions",
 	"author": "Ralf Weinbrecher",
 	"authorUrl": "https://github.com/rwbr",
