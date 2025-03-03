@@ -5,14 +5,13 @@ import {
 	Setting,
 	MarkdownPostProcessorContext,
 	MarkdownRenderer,
-	Notice
 } from 'obsidian';
 
-import { Decoration, DecorationSet } from '@codemirror/view';
+import { Decoration, DecorationSet, ViewUpdate } from '@codemirror/view';
 import { Range } from '@codemirror/state';
 import { ViewPlugin, EditorView } from '@codemirror/view';
 
-/** Plugin-Einstellungen */
+/** Plugin Settings */
 interface DocusaurusAdmonitionSettings {
 	enabledAdmonitions: {
 		note: boolean;
@@ -22,9 +21,18 @@ interface DocusaurusAdmonitionSettings {
 		danger: boolean;
 	};
 	customCSS: boolean;
-	enableCodeBlockSyntax: boolean; // Neue Option für die Code-Block-Syntax
 }
 
+/**
+ * Default settings for the Docusaurus Admonition plugin.
+ * @property {Object} enabledAdmonitions - Object controlling which admonition types are enabled.
+ * @property {boolean} enabledAdmonitions.note - Whether 'note' admonitions are enabled.
+ * @property {boolean} enabledAdmonitions.tip - Whether 'tip' admonitions are enabled.
+ * @property {boolean} enabledAdmonitions.info - Whether 'info' admonitions are enabled.
+ * @property {boolean} enabledAdmonitions.warning - Whether 'warning' admonitions are enabled.
+ * @property {boolean} enabledAdmonitions.danger - Whether 'danger' admonitions are enabled.
+ * @property {boolean} customCSS - Whether custom CSS styling for admonitions is enabled.
+ */
 const DEFAULT_SETTINGS: DocusaurusAdmonitionSettings = {
 	enabledAdmonitions: {
 		note: true,
@@ -34,88 +42,24 @@ const DEFAULT_SETTINGS: DocusaurusAdmonitionSettings = {
 		danger: true
 	},
 	customCSS: true,
-	enableCodeBlockSyntax: false // Standardmäßig deaktiviert
 };
 
 export default class DocusaurusAdmonitionsPlugin extends Plugin {
 	settings: DocusaurusAdmonitionSettings;
 
-	/** Wird aufgerufen, wenn das Plugin geladen wird. */
+	/** Called when the plugin is loaded. */
 	async onload() {
-		console.log('Docusaurus Admonitions Plugin geladen');
-
-		// 1. Plugin-Einstellungen laden
+		// 1. Load plugin settings
 		await this.loadSettings();
 
-		// 2. CSS-Styles einfügen
-		this.injectStyles();
-
-		// 3. Code-Block-Processor für Reading Mode (nur wenn aktiviert)
-		if (this.settings.enableCodeBlockSyntax) {
-			this.registerMarkdownCodeBlockProcessor('note', this.processAdmonition.bind(this, 'note'));
-			this.registerMarkdownCodeBlockProcessor('tip', this.processAdmonition.bind(this, 'tip'));
-			this.registerMarkdownCodeBlockProcessor('info', this.processAdmonition.bind(this, 'info'));
-			this.registerMarkdownCodeBlockProcessor('warning', this.processAdmonition.bind(this, 'warning'));
-			this.registerMarkdownCodeBlockProcessor('danger', this.processAdmonition.bind(this, 'danger'));
-		}
-
-		// 4. Live Preview-Unterstützung (Edit Mode)
+		// 2. Live Preview support (Edit Mode)
 		this.registerLivePreviewRenderer();
 
-		// 5. Einstellungs-Tab hinzufügen
+		// 3. Add settings tab
 		this.addSettingTab(new DocusaurusAdmonitionsSettingTab(this.app, this));
-
-		// Debugging-Funktion zur Verfügung stellen
-		(window as any).inspectDocusaurusAdmonitions = this.inspectAdmonitions;
-		console.log("Debug-Funktion verfügbar: window.inspectDocusaurusAdmonitions()");
-
-		// Nach 3 Sekunden automatisch inspizieren
-		setTimeout(() => {
-			console.log(this.inspectAdmonitions());
-		}, 3000);
 	}
 
-	/** Erstellt & injiziert CSS-Styles für Reading Mode und Live Preview. */
-	injectStyles() {
-		// Keine direkte CSS-Einfügung mehr - styles.css wird automatisch von Obsidian geladen
-		console.log("Docusaurus Admonitions: Styles werden über styles.css geladen.");
-	}
-
-	/** Verarbeitet Code-Blöcke (z. B. ```note ... ```), um Reading Mode-Admonitions zu erzeugen. */
-	async processAdmonition(type: string, source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-		if (!this.settings.enabledAdmonitions[type as keyof typeof this.settings.enabledAdmonitions]) {
-			return;
-		}
-
-		// Gesamten Container leeren und neu erstellen
-		el.empty();
-
-		const admonitionDiv = el.createDiv({
-			cls: ['docusaurus-admonition', `docusaurus-admonition-${type}`]
-		});
-
-		// Titel OHNE text-Option erstellen, damit wir HTML verwenden können
-		const titleDiv = admonitionDiv.createDiv({
-			cls: 'docusaurus-admonition-title'
-		});
-
-		// Text manuell setzen (kein HTML-Escaping)
-		titleDiv.textContent = type.toUpperCase();
-
-		console.log(`Admonition erstellt: ${type}`, {
-			'Hat Titel?': admonitionDiv.querySelector('.docusaurus-admonition-title') !== null,
-			'Elternelement': el.parentElement?.tagName,
-			'CSS geladen?': document.getElementById('docusaurus-admonitions-styles') !== null
-		});
-
-		const contentDiv = admonitionDiv.createDiv({
-			cls: 'docusaurus-admonition-content'
-		});
-
-		await MarkdownRenderer.renderMarkdown(source, contentDiv, ctx.sourcePath, this);
-	}
-
-	/** Verarbeitet die :::type-Syntax in Reading Mode. */
+	/** Processes the :::type syntax in Reading Mode. */
 	async processCustomAdmonitionSyntax(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
 		const paragraphs = el.querySelectorAll('p');
 
@@ -124,12 +68,12 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 			const text = p.textContent?.trim();
 			if (!text || !text.startsWith(':::')) continue;
 
-			// Typ ermitteln
+			// Determine type
 			const match = text.match(/^:::(note|tip|info|warning|danger)(?:\s|$)/);
 			if (!match) continue;
 			const type = match[1];
 
-			// Einzeilige Admonition
+			// Single line admonition
 			const singleLineMatch = text.match(/^:::(note|tip|info|warning|danger)\s+([\s\S]+?)\s+:::$/);
 			if (singleLineMatch) {
 				const singleType = singleLineMatch[1];
@@ -152,7 +96,7 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 				continue;
 			}
 
-			// Mehrzeilige Admonition
+			// Multi-line admonition
 			let endIndex = -1;
 			let content: HTMLElement[] = [];
 			for (let j = i + 1; j < paragraphs.length; j++) {
@@ -170,7 +114,7 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 				continue;
 			}
 
-			// Container bauen
+			// Build container
 			const admonitionDiv = el.createDiv({
 				cls: ['docusaurus-admonition', `docusaurus-admonition-${type}`]
 			});
@@ -191,7 +135,7 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 		}
 	}
 
-	/** Registriert Post-Processor & CodeMirror-Dekorationen für Live Preview. */
+	/** Registers Post-Processor & CodeMirror decorations for Live Preview. */
 	registerLivePreviewRenderer() {
 		// A) Reading Mode: Processors
 		this.registerMarkdownPostProcessor((el, ctx) => {
@@ -200,93 +144,30 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 
 		// B) Live Preview (Edit Mode) via EditorView Plugin
 		try {
-			const pluginExtension = createAdmonitionViewPlugin();
+			const pluginExtension = createAdmonitionViewPlugin(this.settings);
 			this.registerEditorExtension([pluginExtension]);
-			console.log("Docusaurus Admonitions: Live Preview aktiviert.");
 		} catch (e) {
-			console.error("Docusaurus Admonitions: Live Preview konnte nicht aktiviert werden:", e);
-			this.addCSS_Fallback();
+			// Silent fallback - styles already defined in CSS
 		}
 	}
 
-	/** Fallback: Einfaches CSS, falls das ViewPlugin scheitert */
-	addCSS_Fallback() {
-		// Fallback-Styles sind jetzt in styles.css definiert
-		console.log("Docusaurus Admonitions: Fallback-CSS über styles.css verfügbar.");
-	}
-
-	/** Beim Deaktivieren: CSS & Debug-Elemente entfernen. */
+	/** Called when the plugin is disabled */
 	onunload() {
-		// Obsidian kümmert sich automatisch um das Entladen der styles.css
-		console.log('Docusaurus Admonitions: Plugin entladen.');
+		// No actions required - Obsidian handles resource cleanup
 	}
 
-	/** Einstellungen laden */
+	/** Load settings */
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
 
-	/** Einstellungen speichern */
+	/** Save settings */
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-
-	/** Debugging-Funktion für dein Dokument */
-	testDocumentStructure() {
-		// Temporärer Button in der Obsidian-UI
-		const debugBtn = document.createElement('button');
-		debugBtn.textContent = 'DEBUG';
-		debugBtn.style.position = 'fixed';
-		debugBtn.style.top = '10px';
-		debugBtn.style.right = '10px';
-		debugBtn.style.zIndex = '1000';
-
-		debugBtn.addEventListener('click', () => {
-			const activeLeaf = this.app.workspace.activeLeaf;
-			if (!activeLeaf) return;
-
-			const view = activeLeaf.view;
-			if (view.getViewType() === "markdown") {
-				console.log("Aktuelle Dokument-Struktur:");
-				const previewEl = view.containerEl.querySelector('.markdown-preview-view');
-				if (previewEl) {
-					console.log(previewEl.innerHTML);
-					const paragraphs = previewEl.querySelectorAll('p');
-					paragraphs.forEach((p, i) => {
-						console.log(`P[${i}]: "${p.textContent}"`);
-					});
-				}
-			}
-		});
-
-		document.body.appendChild(debugBtn);
-	}
-
-	inspectAdmonitions() {
-		// Suche im gesamten Dokument nach Admonitions und protokolliere deren Struktur
-		const admonitions = document.querySelectorAll('.docusaurus-admonition');
-		console.log(`${admonitions.length} Admonitions gefunden`);
-
-		admonitions.forEach((adm, i) => {
-			const type = Array.from(adm.classList)
-				.find(c => c.startsWith('docusaurus-admonition-') && c !== 'docusaurus-admonition')
-				?.replace('docusaurus-admonition-', '') || 'unbekannt';
-
-			console.log(`Admonition #${i} (${type}):`);
-			console.log('- HTML:', adm.outerHTML);
-			console.log('- Titel vorhanden:', adm.querySelector('.docusaurus-admonition-title') !== null);
-			console.log('- Computed Style für Titel:',
-				window.getComputedStyle(
-					adm.querySelector('.docusaurus-admonition-title') || adm
-				)
-			);
-		});
-
-		return `${admonitions.length} Admonitions inspiziert`;
-	}
 }
 
-/** Einstellungs-Tab */
+/** Settings Tab */
 class DocusaurusAdmonitionsSettingTab extends PluginSettingTab {
 	plugin: DocusaurusAdmonitionsPlugin;
 
@@ -299,9 +180,9 @@ class DocusaurusAdmonitionsSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Docusaurus Admonitions Einstellungen' });
+		containerEl.createEl('h2', { text: 'Docusaurus Admonitions Settings' });
 
-		const desc = 'Aktiviert die :::SYNTAX Admonition';
+		const desc = 'Enables :::SYNTAX admonition';
 		const types = ['note', 'tip', 'info', 'warning', 'danger'] as const;
 
 		types.forEach(type => {
@@ -313,40 +194,28 @@ class DocusaurusAdmonitionsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.enabledAdmonitions[type] = value;
 						await this.plugin.saveSettings();
+
+						// Force editor refresh to apply setting changes
+						this.plugin.registerLivePreviewRenderer();
 					})
 				);
 		});
-
-		containerEl.createEl('h3', { text: 'Syntax-Optionen' });
-
-		new Setting(containerEl)
-			.setName('Code-Block-Syntax aktivieren')
-			.setDesc('Ermöglicht die Verwendung von ```note Code-Blöcken für Admonitions. Diese Syntax ist nicht Docusaurus-kompatibel.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.enableCodeBlockSyntax)
-				.onChange(async (value) => {
-					this.plugin.settings.enableCodeBlockSyntax = value;
-					await this.plugin.saveSettings();
-					// Hinweis anzeigen, dass Neustart erforderlich ist
-					new Notice('Bitte Obsidian neu starten, um die Syntax-Änderung wirksam zu machen.');
-				})
-			);
 	}
 }
 
-/** ViewPlugin: Dekoriert die :::-Zeilen im Edit Mode (Live Preview). */
-function createAdmonitionViewPlugin() {
+/** ViewPlugin: Decorates the ::: lines in Edit Mode (Live Preview). */
+function createAdmonitionViewPlugin(settings: DocusaurusAdmonitionSettings) {
 	return ViewPlugin.fromClass(
 		class {
 			decorations: DecorationSet;
 
 			constructor(view: EditorView) {
-				this.decorations = computeAdmonitionDecorations(view);
+				this.decorations = computeAdmonitionDecorations(view, settings);
 			}
 
-			update(update: any) {
+			update(update: ViewUpdate) {
 				if (update.docChanged || update.viewportChanged) {
-					this.decorations = computeAdmonitionDecorations(update.view);
+					this.decorations = computeAdmonitionDecorations(update.view, settings);
 				}
 			}
 		},
@@ -356,8 +225,8 @@ function createAdmonitionViewPlugin() {
 	);
 }
 
-/** Erzeugt ein DecorationSet, das Start-/Endzeilen und Inhalt im Edit Mode hervorhebt. */
-function computeAdmonitionDecorations(view: EditorView): DecorationSet {
+/** Creates a DecorationSet that highlights start/end lines and content in Edit Mode. */
+function computeAdmonitionDecorations(view: EditorView, settings: DocusaurusAdmonitionSettings): DecorationSet {
 	const types = ['note', 'tip', 'info', 'warning', 'danger'];
 	const decorations: Range<Decoration>[] = [];
 	const doc = view.state.doc;
@@ -367,26 +236,29 @@ function computeAdmonitionDecorations(view: EditorView): DecorationSet {
 		const line = doc.lineAt(pos);
 		const text = line.text;
 
-		// Prüfe auf Admonition-Start (z.B. :::note)
-		let foundStart = false;
+		// Check for admonition start (e.g., :::note)
 		for (const t of types) {
+			// Check if this type is enabled in settings
+			if (!settings.enabledAdmonitions[t as keyof typeof settings.enabledAdmonitions]) {
+				continue;
+			}
+
 			const startRegex = new RegExp(`^:::${t}(?:\\s|$)`);
 			if (startRegex.test(text)) {
-				// Start-Zeile
+				// Start line
 				decorations.push(
 					Decoration.line({
 						attributes: { class: `admonition-${t}-start` }
 					}).range(line.from)
 				);
-				foundStart = true;
 
-				// => Ab jetzt: alle folgenden Zeilen (Inhalt) stylen, bis wir ":::"
+				// Now style all following lines (content) until we find ":::"
 				let innerPos = line.to + 1;
 				while (innerPos < doc.length) {
 					const innerLine = doc.lineAt(innerPos);
 					const innerText = innerLine.text.trim();
 
-					// Ende-Zeile?
+					// End line?
 					if (innerText === ':::') {
 						decorations.push(
 							Decoration.line({
@@ -395,7 +267,7 @@ function computeAdmonitionDecorations(view: EditorView): DecorationSet {
 						);
 						break;
 					} else {
-						// Inhalt
+						// Content
 						decorations.push(
 							Decoration.line({
 								attributes: { class: `admonition-${t}-content` }
