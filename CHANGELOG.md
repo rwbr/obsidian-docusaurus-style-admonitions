@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.1 (2025-03-03)
+
+### Changed
+- Moved all CSS styling from JavaScript to dedicated styles.css file for better theme compatibility
+- Fixed settings toggle functionality - enabling/disabling admonition types now works properly
+- Improved rendering performance in Live Preview mode
+
+### Removed
+- Removed code block syntax support for better Docusaurus compatibility
+- Removed debugging outputs and console logs
+- Removed inline styling in favor of CSS classes
+
 ## 0.1.0 (2025-03-02)
 
 ### Added
