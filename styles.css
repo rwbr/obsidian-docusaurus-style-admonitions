@@ -1,8 +1,250 @@
-/*
-
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
-
+/* 
+   Alle CSS-Stile für das Docusaurus Admonition Plugin
+   - Reading Mode Styles
+   - Live Preview (Edit Mode) Styles
+   - Fallback Styles
 */
+
+/* =============== READING MODE STYLES =============== */
+.docusaurus-admonition {
+    margin-bottom: 1em;
+    padding: 16px;
+    border-radius: 8px;
+    border-left: 0;
+    background-color: var(--background-secondary);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Farbige Seitenleiste für jeden Typ */
+.docusaurus-admonition::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+}
+
+.docusaurus-admonition-note::before { background-color: #3578e5; }
+.docusaurus-admonition-tip::before { background-color: #00a400; }
+.docusaurus-admonition-info::before { background-color: #3578e5; }
+.docusaurus-admonition-warning::before { background-color: #e6a700; }
+.docusaurus-admonition-danger::before { background-color: #fa383e; }
+
+/* Titel mit Icons und Farben */
+.docusaurus-admonition-title {
+    margin-top: 0 !important;
+    margin-bottom: 14px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    font-size: 0.8em !important;
+    line-height: 1.5 !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Icons für jeden Admonition-Typ */
+.docusaurus-admonition-title::before {
+    content: '' !important;
+    margin-right: 8px !important;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    display: inline-block !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: contain !important;
+}
+
+/* Icon für NOTE (Info Circle) */
+.docusaurus-admonition-note .docusaurus-admonition-title {
+    color: #3578e5;
+}
+.docusaurus-admonition-note .docusaurus-admonition-title::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 512 512'%3E%3Cpath fill='%233578e5' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 128c17.67 0 32 14.33 32 32c0 17.67-14.33 32-32 32S224 177.7 224 160C224 142.3 238.3 128 256 128zM296 384h-80C202.8 384 192 373.3 192 360s10.75-24 24-24h16v-64H224c-13.25 0-24-10.75-24-24S210.8 224 224 224h32c13.25 0 24 10.75 24 24v88h16c13.25 0 24 10.75 24 24S309.3 384 296 384z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+/* Icon für TIP (Lightbulb) */
+.docusaurus-admonition-tip .docusaurus-admonition-title {
+    color: #00a400;
+}
+.docusaurus-admonition-tip .docusaurus-admonition-title::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512'%3E%3Cpath fill='%2300a400' d='M112.1 454.3c0 6.297 1.816 12.44 5.284 17.69l17.14 25.69c5.25 7.875 17.17 14.28 26.64 14.28h61.67c9.438 0 21.36-6.401 26.61-14.28l17.08-25.68c2.938-4.438 5.348-12.37 5.348-17.7L272 415.1h-160L112.1 454.3zM191.4 .0132C89.44 .3257 16 82.97 16 175.1c0 44.38 16.44 84.84 43.56 115.8c16.53 18.84 42.34 58.23 52.22 91.45c.0313 .25 .0938 .5166 .125 .7823h160.2c.0313-.2656 .0938-.5166 .125-.7823c9.875-33.22 35.69-72.61 52.22-91.45C351.6 260.8 368 220.4 368 175.1C368 78.61 288.9 .0132 191.4 .0132zM192 96.01c-44.13 0-80 35.89-80 79.1C112 184.8 104.8 192 96 192S80 184.8 80 176c0-61.76 50.25-111.1 112-111.1c8.844 0 16 7.159 16 16S200.8 96.01 192 96.01z'/%3E%3C/svg%3E");
+}
+
+/* Icon für INFO (Info Circle) - gleich wie NOTE */
+.docusaurus-admonition-info .docusaurus-admonition-title {
+    color: #3578e5;
+}
+.docusaurus-admonition-info .docusaurus-admonition-title::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 512 512'%3E%3Cpath fill='%233578e5' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 128c17.67 0 32 14.33 32 32c0 17.67-14.33 32-32 32S224 177.7 224 160C224 142.3 238.3 128 256 128zM296 384h-80C202.8 384 192 373.3 192 360s10.75-24 24-24h16v-64H224c-13.25 0-24-10.75-24-24S210.8 224 224 224h32c13.25 0 24 10.75 24 24v88h16c13.25 0 24 10.75 24 24S309.3 384 296 384z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+/* Icon für WARNING (Exclamation Triangle) */
+.docusaurus-admonition-warning .docusaurus-admonition-title {
+    color: #e6a700;
+}
+.docusaurus-admonition-warning .docusaurus-admonition-title::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23e6a700' d='M506.3 417l-213.3-364c-16.33-28-57.54-28-73.98 0l-213.2 364C-10.59 444.9 9.849 480 42.74 480h426.6C502.1 480 522.6 445 506.3 417zM232 168c0-13.25 10.75-24 24-24S280 154.8 280 168v128c0 13.25-10.75 24-24 24S232 309.3 232 296V168zM256 416c-17.36 0-31.44-14.08-31.44-31.44c0-17.36 14.07-31.44 31.44-31.44s31.44 14.08 31.44 31.44C287.4 401.9 273.4 416 256 416z'/%3E%3C/svg%3E");
+}
+
+/* Icon für DANGER (Exclamation Circle) */
+.docusaurus-admonition-danger .docusaurus-admonition-title {
+    color: #fa383e;
+}
+.docusaurus-admonition-danger .docusaurus-admonition-title::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23fa383e' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM232 152C232 138.8 242.8 128 256 128s24 10.75 24 24v128c0 13.25-10.75 24-24 24S232 293.3 232 280V152zM256 400c-17.36 0-31.44-14.08-31.44-31.44c0-17.36 14.07-31.44 31.44-31.44s31.44 14.08 31.44 31.44C287.4 385.9 273.4 400 256 400z'/%3E%3C/svg%3E");
+}
+
+/* Inhalt-Styling */
+.docusaurus-admonition-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* =============== LIVE PREVIEW / EDIT MODE STYLES =============== */
+/* Allgemeine Styles für Admonition-Zeilen */
+.admonition-note-start, .admonition-note-end, .admonition-note-content,
+.admonition-tip-start, .admonition-tip-end, .admonition-tip-content,
+.admonition-info-start, .admonition-info-end, .admonition-info-content,
+.admonition-warning-start, .admonition-warning-end, .admonition-warning-content,
+.admonition-danger-start, .admonition-danger-end, .admonition-danger-content {
+    padding-left: 20px !important; /* Erhöhter Abstand für alle Admonition-Zeilen */
+    position: relative;
+}
+
+/* Linien an der Seite für jeden Typ */
+.admonition-note-start::before, .admonition-note-end::before, .admonition-note-content::before,
+.admonition-tip-start::before, .admonition-tip-end::before, .admonition-tip-content::before,
+.admonition-info-start::before, .admonition-info-end::before, .admonition-info-content::before,
+.admonition-warning-start::before, .admonition-warning-end::before, .admonition-warning-content::before,
+.admonition-danger-start::before, .admonition-danger-end::before, .admonition-danger-content::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 4px;
+}
+
+/* Note Style mit Icon */
+.admonition-note-start, .admonition-note-end, .admonition-note-content {
+    background-color: rgba(53, 120, 229, 0.05);
+}
+.admonition-note-start::before, .admonition-note-end::before, .admonition-note-content::before {
+    background-color: #3578e5;
+}
+.admonition-note-start {
+    font-weight: bold;
+    color: #3578e5 !important;
+    padding-left: 44px !important; /* Mehr Platz für das Icon */
+    position: relative; /* Notwendig für die absolute Positionierung */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='16' height='16'%3E%3Cpath fill='%233578e5' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 128c17.67 0 32 14.33 32 32c0 17.67-14.33 32-32 32S224 177.7 224 160C224 142.3 238.3 128 256 128zM296 384h-80C202.8 384 192 373.3 192 360s10.75-24 24-24h16v-64H224c-13.25 0-24-10.75-24-24S210.8 224 224 224h32c13.25 0 24 10.75 24 24v88h16c13.25 0 24 10.75 24 24S309.3 384 296 384z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 20px center !important; /* Icon-Position anpassen */
+    background-size: 16px;
+}
+
+/* Tip Style mit Icon */
+.admonition-tip-start, .admonition-tip-end, .admonition-tip-content {
+    background-color: rgba(0, 164, 0, 0.05);
+}
+.admonition-tip-start::before, .admonition-tip-end::before, .admonition-tip-content::before {
+    background-color: #00a400;
+}
+.admonition-tip-start {
+    font-weight: bold;
+    color: #00a400 !important;
+    padding-left: 44px !important; /* Mehr Platz für das Icon */
+    position: relative; /* Notwendig für die absolute Positionierung */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512' width='16' height='16'%3E%3Cpath fill='%2300a400' d='M112.1 454.3c0 6.297 1.816 12.44 5.284 17.69l17.14 25.69c5.25 7.875 17.17 14.28 26.64 14.28h61.67c9.438 0 21.36-6.401 26.61-14.28l17.08-25.68c2.938-4.438 5.348-12.37 5.348-17.7L272 415.1h-160L112.1 454.3zM191.4 .0132C89.44 .3257 16 82.97 16 175.1c0 44.38 16.44 84.84 43.56 115.8c16.53 18.84 42.34 58.23 52.22 91.45c.0313 .25 .0938 .5166 .125 .7823h160.2c.0313-.2656 .0938-.5166 .125-.7823c9.875-33.22 35.69-72.61 52.22-91.45C351.6 260.8 368 220.4 368 175.1C368 78.61 288.9 .0132 191.4 .0132zM192 96.01c-44.13 0-80 35.89-80 79.1C112 184.8 104.8 192 96 192S80 184.8 80 176c0-61.76 50.25-111.1 112-111.1c8.844 0 16 7.159 16 16S200.8 96.01 192 96.01z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 20px center !important; /* Icon-Position anpassen */
+    background-size: 16px;
+}
+
+/* Info Style mit Icon */
+.admonition-info-start, .admonition-info-end, .admonition-info-content {
+    background-color: rgba(53, 120, 229, 0.05);
+}
+.admonition-info-start::before, .admonition-info-end::before, .admonition-info-content::before {
+    background-color: #3578e5;
+}
+.admonition-info-start {
+    font-weight: bold;
+    color: #3578e5 !important;
+    padding-left: 44px !important; /* Mehr Platz für das Icon */
+    position: relative; /* Notwendig für die absolute Positionierung */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='16' height='16'%3E%3Cpath fill='%233578e5' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM256 128c17.67 0 32 14.33 32 32c0 17.67-14.33 32-32 32S224 177.7 224 160C224 142.3 238.3 128 256 128zM296 384h-80C202.8 384 192 373.3 192 360s10.75-24 24-24h16v-64H224c-13.25 0-24-10.75-24-24S210.8 224 224 224h32c13.25 0 24 10.75 24 24v88h16c13.25 0 24 10.75 24 24S309.3 384 296 384z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 20px center !important; /* Icon-Position anpassen */
+    background-size: 16px;
+}
+
+/* Warning Style mit Icon */
+.admonition-warning-start, .admonition-warning-end, .admonition-warning-content {
+    background-color: rgba(230, 167, 0, 0.05);
+}
+.admonition-warning-start::before, .admonition-warning-end::before, .admonition-warning-content::before {
+    background-color: #e6a700;
+}
+.admonition-warning-start {
+    font-weight: bold;
+    color: #e6a700 !important;
+    padding-left: 44px !important; /* Mehr Platz für das Icon */
+    position: relative; /* Notwendig für die absolute Positionierung */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='16' height='16'%3E%3Cpath fill='%23e6a700' d='M506.3 417l-213.3-364c-16.33-28-57.54-28-73.98 0l-213.2 364C-10.59 444.9 9.849 480 42.74 480h426.6C502.1 480 522.6 445 506.3 417zM232 168c0-13.25 10.75-24 24-24S280 154.8 280 168v128c0 13.25-10.75 24-24 24S232 309.3 232 296V168zM256 416c-17.36 0-31.44-14.08-31.44-31.44c0-17.36 14.07-31.44 31.44-31.44s31.44 14.08 31.44 31.44C287.4 401.9 273.4 416 256 416z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 20px center !important; /* Icon-Position anpassen */
+    background-size: 16px;
+}
+
+/* Danger Style mit Icon */
+.admonition-danger-start, .admonition-danger-end, .admonition-danger-content {
+    background-color: rgba(250, 56, 62, 0.05);
+}
+.admonition-danger-start::before, .admonition-danger-end::before, .admonition-danger-content::before {
+    background-color: #fa383e;
+}
+.admonition-danger-start {
+    font-weight: bold;
+    color: #fa383e !important;
+    padding-left: 44px !important; /* Mehr Platz für das Icon */
+    position: relative; /* Notwendig für die absolute Positionierung */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='16' height='16'%3E%3Cpath fill='%23fa383e' d='M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256s256-114.6 256-256S397.4 0 256 0zM232 152C232 138.8 242.8 128 256 128s24 10.75 24 24v128c0 13.25-10.75 24-24 24S232 293.3 232 280V152zM256 400c-17.36 0-31.44-14.08-31.44-31.44c0-17.36 14.07-31.44 31.44-31.44s31.44 14.08 31.44 31.44C287.4 385.9 273.4 400 256 400z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 20px center !important; /* Icon-Position anpassen */
+    background-size: 16px;
+}
+
+/* =============== FALLBACK STYLES =============== */
+/* Minimaler Fallback: Hebt nur Zeilen mit :::note etc. farbig hervor. */
+.cm-line:has(.cm-string:contains(':::note')) {
+    color: #448aff;
+    border-left: 3px solid #448aff;
+    font-weight: bold;
+}
+
+.cm-line:has(.cm-string:contains(':::tip')) {
+    color: #00a400;
+    border-left: 3px solid #00a400;
+    font-weight: bold;
+}
+
+.cm-line:has(.cm-string:contains(':::info')) {
+    color: #3578e5;
+    border-left: 3px solid #3578e5;
+    font-weight: bold;
+}
+
+.cm-line:has(.cm-string:contains(':::warning')) {
+    color: #e6a700;
+    border-left: 3px solid #e6a700;
+    font-weight: bold;
+}
+
+.cm-line:has(.cm-string:contains(':::danger')) {
+    color: #fa383e;
+    border-left: 3px solid #fa383e;
+    font-weight: bold;
+}
