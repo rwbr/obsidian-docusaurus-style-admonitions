@@ -1,10 +1,9 @@
 {
 	"id": "docusaurus-style-admonitions",
 	"name": "Docusaurus Style Admonitions",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"minAppVersion": "1.4.0",
 	"description": "Adds Docusaurus style admonitions",
-	"repositoryUrl": "https://github.com/rwbr/obsidian-docusaurus-style-admonitions",
 	"author": "Ralf Weinbrecher",
 	"authorUrl": "https://github.com/rwbr",
 	"isDesktopOnly": false

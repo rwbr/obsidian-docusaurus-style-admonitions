@@ -20,7 +20,6 @@ interface DocusaurusAdmonitionSettings {
 		warning: boolean;
 		danger: boolean;
 	};
-	customCSS: boolean;
 }
 
 /**
@@ -31,7 +30,6 @@ interface DocusaurusAdmonitionSettings {
  * @property {boolean} enabledAdmonitions.info - Whether 'info' admonitions are enabled.
  * @property {boolean} enabledAdmonitions.warning - Whether 'warning' admonitions are enabled.
  * @property {boolean} enabledAdmonitions.danger - Whether 'danger' admonitions are enabled.
- * @property {boolean} customCSS - Whether custom CSS styling for admonitions is enabled.
  */
 const DEFAULT_SETTINGS: DocusaurusAdmonitionSettings = {
 	enabledAdmonitions: {
@@ -41,25 +39,68 @@ const DEFAULT_SETTINGS: DocusaurusAdmonitionSettings = {
 		warning: true,
 		danger: true
 	},
-	customCSS: true,
 };
 
+/**
+ * Obsidian plugin that implements Docusaurus-style admonitions.
+ * 
+ * This plugin enables the use of :::type syntax to create formatted admonition 
+ * blocks in both reading and live preview modes. Supported admonition types include:
+ * note, tip, info, warning, and danger.
+ * 
+ * Admonitions can be used in two formats:
+ * 1. Single-line: :::type Content here :::
+ * 2. Multi-line:
+ *    :::type
+ *    Content here
+ *    :::
+ * 
+ * The plugin handles both rendering modes:
+ * - Reading mode: Processed via Markdown post processor
+ * - Live Preview: Implemented through editor extensions
+ * 
+ * @extends Plugin Obsidian's base plugin class
+ */
 export default class DocusaurusAdmonitionsPlugin extends Plugin {
 	settings: DocusaurusAdmonitionSettings;
+	private editorExtensions: ViewPlugin<{
+		decorations: DecorationSet;
+		update(update: ViewUpdate): void;
+	}>[] = [];
 
 	/** Called when the plugin is loaded. */
 	async onload() {
 		// 1. Load plugin settings
 		await this.loadSettings();
 
-		// 2. Live Preview support (Edit Mode)
-		this.registerLivePreviewRenderer();
+		// 2. Register Markdown post processor (nur einmal)
+		this.registerMarkdownPostProcessor((el, ctx) => {
+			this.processCustomAdmonitionSyntax(el, ctx);
+		});
 
-		// 3. Add settings tab
+		// 3. Initialisiere Live Preview-Unterstützung
+		this.updateEditorExtensions();
+
+		// 4. Add settings tab
 		this.addSettingTab(new DocusaurusAdmonitionsSettingTab(this.app, this));
 	}
 
 	/** Processes the :::type syntax in Reading Mode. */
+	/**
+	 * Processes custom admonition syntax in markdown content.
+	 * 
+	 * This method parses and transforms paragraphs starting with ":::" into styled admonition elements.
+	 * It supports both single-line and multi-line admonition formats:
+	 * - Single-line: :::type content :::
+	 * - Multi-line: :::type (content paragraphs) :::
+	 * 
+	 * Supported admonition types: note, tip, info, warning, and danger.
+	 * Admonitions will only be rendered if they are enabled in the plugin settings.
+	 * 
+	 * @param el - The HTML element containing paragraphs to process
+	 * @param ctx - The markdown post processor context
+	 * @returns A Promise that resolves when all admonitions have been processed
+	 */
 	async processCustomAdmonitionSyntax(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
 		const paragraphs = el.querySelectorAll('p');
 
@@ -91,7 +132,7 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 					text: singleType.toUpperCase()
 				});
 				const contentDiv = admonitionDiv.createDiv({ cls: 'docusaurus-admonition-content' });
-				await MarkdownRenderer.renderMarkdown(content, contentDiv, ctx.sourcePath, this);
+				await MarkdownRenderer.render(this.app, content, contentDiv, ctx.sourcePath, this);
 				p.replaceWith(admonitionDiv);
 				continue;
 			}
@@ -136,16 +177,19 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 	}
 
 	/** Registers Post-Processor & CodeMirror decorations for Live Preview. */
-	registerLivePreviewRenderer() {
-		// A) Reading Mode: Processors
-		this.registerMarkdownPostProcessor((el, ctx) => {
-			this.processCustomAdmonitionSyntax(el, ctx);
-		});
-
-		// B) Live Preview (Edit Mode) via EditorView Plugin
+	updateEditorExtensions() {
 		try {
+			// Erstelle neue ViewPlugin-Instanz mit aktuellen Einstellungen
 			const pluginExtension = createAdmonitionViewPlugin(this.settings);
-			this.registerEditorExtension([pluginExtension]);
+
+			// Alte Erweiterungen entfernen (falls vorhanden)
+			this.editorExtensions = [];
+
+			// Neue Erweiterung hinzufügen
+			this.editorExtensions.push(pluginExtension);
+
+			// Registriere die aktualisierte Extensions-Liste
+			this.registerEditorExtension(this.editorExtensions);
 		} catch (e) {
 			// Silent fallback - styles already defined in CSS
 		}
@@ -180,8 +224,6 @@ class DocusaurusAdmonitionsSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Docusaurus Admonitions Settings' });
-
 		const desc = 'Enables :::SYNTAX admonition';
 		const types = ['note', 'tip', 'info', 'warning', 'danger'] as const;
 
@@ -195,8 +237,8 @@ class DocusaurusAdmonitionsSettingTab extends PluginSettingTab {
 						this.plugin.settings.enabledAdmonitions[type] = value;
 						await this.plugin.saveSettings();
 
-						// Force editor refresh to apply setting changes
-						this.plugin.registerLivePreviewRenderer();
+						// Statt registerLivePreviewRenderer() aufzurufen, nur die Extensions aktualisieren
+						this.plugin.updateEditorExtensions();
 					})
 				);
 		});
