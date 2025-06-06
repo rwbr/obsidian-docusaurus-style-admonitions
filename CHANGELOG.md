@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.2 (2025-06-06)
+
+### Fixed
+
+- Issue [#1](https://github.com/rwbr/obsidian-docusaurus-style-admonitions/issues/1)
+
+### New
+
+- Issue [#3](https://github.com/rwbr/obsidian-docusaurus-style-admonitions/issues/3). Plugin now supports admonitions with title
+
+
 ## 0.1.1 (2025-03-03)
 
 ### Changed

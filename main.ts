@@ -92,7 +92,9 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 	 * This method parses and transforms paragraphs starting with ":::" into styled admonition elements.
 	 * It supports both single-line and multi-line admonition formats:
 	 * - Single-line: :::type content :::
+	 * - Single-line with custom title: :::type [Custom Title] content :::
 	 * - Multi-line: :::type (content paragraphs) :::
+	 * - Multi-line with custom title: :::type [Custom Title] (content paragraphs) :::
 	 * 
 	 * Supported admonition types: note, tip, info, warning, and danger.
 	 * Admonitions will only be rendered if they are enabled in the plugin settings.
@@ -112,15 +114,16 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 			// Determine type
 			const match = text.match(/^:::(note|tip|info|warning|danger)(?:\s|$)/);
 			if (!match) continue;
-			const type = match[1];
 
-			// Single line admonition
-			const singleLineMatch = text.match(/^:::(note|tip|info|warning|danger)\s+([\s\S]+?)\s+:::$/);
+			// Single line admonition - unterstützt nun auch benutzerdefinierte Titel
+			// Syntax: :::type [Custom Title] Content :::
+			const singleLineMatch = text.match(/^:::(note|tip|info|warning|danger)(?:\s+\[(.*?)\])?\s+([\s\S]+?)\s+:::$/);
 			if (singleLineMatch) {
 				const singleType = singleLineMatch[1];
-				const content = singleLineMatch[2];
+				const customTitle = singleLineMatch[2];
+				const content = singleLineMatch[3];
 
-				if (!this.settings.enabledAdmonitions[singleType as keyof typeof this.settings.enabledAdmonitions]) {
+				if (!this.settings.enabledAdmonitions[singleType as keyof DocusaurusAdmonitionSettings['enabledAdmonitions']]) {
 					continue;
 				}
 
@@ -129,7 +132,7 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 				});
 				admonitionDiv.createDiv({
 					cls: 'docusaurus-admonition-title',
-					text: singleType.toUpperCase()
+					text: customTitle || singleType.toUpperCase()
 				});
 				const contentDiv = admonitionDiv.createDiv({ cls: 'docusaurus-admonition-content' });
 				await MarkdownRenderer.render(this.app, content, contentDiv, ctx.sourcePath, this);
@@ -137,9 +140,18 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 				continue;
 			}
 
-			// Multi-line admonition
+			// Multi-line admonition - unterstützt nun auch benutzerdefinierte Titel
+			// Syntax: :::type [Custom Title]
+			//         Content
+			//         :::
+			const multiLineMatch = text.match(/^:::(note|tip|info|warning|danger)(?:\s+\[(.*?)\])?$/);
+			if (!multiLineMatch) continue;
+
+			const multiType = multiLineMatch[1];
+			const customTitle = multiLineMatch[2];
+
 			let endIndex = -1;
-			let content: HTMLElement[] = [];
+			const content: HTMLElement[] = [];
 			for (let j = i + 1; j < paragraphs.length; j++) {
 				const endText = paragraphs[j].textContent?.trim();
 				if (endText === ':::') {
@@ -151,17 +163,17 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 			}
 			if (endIndex === -1) continue;
 
-			if (!this.settings.enabledAdmonitions[type as keyof typeof this.settings.enabledAdmonitions]) {
+			if (!this.settings.enabledAdmonitions[multiType as keyof DocusaurusAdmonitionSettings['enabledAdmonitions']]) {
 				continue;
 			}
 
 			// Build container
 			const admonitionDiv = el.createDiv({
-				cls: ['docusaurus-admonition', `docusaurus-admonition-${type}`]
+				cls: ['docusaurus-admonition', `docusaurus-admonition-${multiType}`]
 			});
 			admonitionDiv.createDiv({
 				cls: 'docusaurus-admonition-title',
-				text: type.toUpperCase()
+				text: customTitle || multiType.toUpperCase()
 			});
 			const contentDiv = admonitionDiv.createDiv({ cls: 'docusaurus-admonition-content' });
 
@@ -278,14 +290,15 @@ function computeAdmonitionDecorations(view: EditorView, settings: DocusaurusAdmo
 		const line = doc.lineAt(pos);
 		const text = line.text;
 
-		// Check for admonition start (e.g., :::note)
+		// Check for admonition start (e.g., :::note or :::note [Custom Title])
 		for (const t of types) {
 			// Check if this type is enabled in settings
-			if (!settings.enabledAdmonitions[t as keyof typeof settings.enabledAdmonitions]) {
+			if (!settings.enabledAdmonitions[t as keyof DocusaurusAdmonitionSettings['enabledAdmonitions']]) {
 				continue;
 			}
 
-			const startRegex = new RegExp(`^:::${t}(?:\\s|$)`);
+			// Überprüfe auf Startzeilen mit oder ohne benutzerdefinierten Titel
+			const startRegex = new RegExp(`^:::${t}(?:\\s+\\[.*?\\])?(?:\\s|$)`);
 			if (startRegex.test(text)) {
 				// Start line
 				decorations.push(

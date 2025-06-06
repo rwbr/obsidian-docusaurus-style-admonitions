@@ -52,6 +52,13 @@ This is a dangerous action!
 :::
 ````
 
+You can include titles like this:
+
+:::info [Title]
+This is an info element with title
+:::
+
+
 ## Configuration
 
 The plugin settings allow you to:
