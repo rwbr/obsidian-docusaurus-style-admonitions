@@ -2,6 +2,10 @@
 
 A plugin for Obsidian that adds support for [Docusaurus-style admonitions](https://docusaurus.io/docs/markdown-features/admonitions). This plugin allows you to create stylish, colored callout boxes with icons for different types of information. This is especially useful, if you manage your Docusaurus content as an Obsidian Vault.
 
+> [!WARNING]
+> **This plugin is no longer maintained.** No further updates or bug fixes will be provided.
+> Consider using [Alternative Plugin](link) instead.
+
 ## Features
 
 - Supports five admonition types: note, tip, info, warning, and danger
