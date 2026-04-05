@@ -11,11 +11,15 @@
     "importHelpers": true,
     "isolatedModules": true,
     "strictNullChecks": true,
+	"types": ["obsidian-typings"],
     "lib": [
-      "DOM",
-      "ES5",
-      "ES6",
-      "ES7"
+		"DOM",
+		"ES5",
+		"ES6",
+		"ES7",
+		"ES2023",
+		"DOM.Iterable",
+		"DOM.AsyncIterable"
     ]
   },
   "include": [

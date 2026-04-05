@@ -104,7 +104,8 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 	 * @returns A Promise that resolves when all admonitions have been processed
 	 */
 	async processCustomAdmonitionSyntax(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-		const paragraphs = el.querySelectorAll('p');
+		//const paragraphs = el.querySelectorAll('p');
+		const paragraphs = ctx.containerEl.querySelectorAll('p');
 
 		for (let i = 0; i < paragraphs.length; i++) {
 			const p = paragraphs[i];
@@ -161,7 +162,7 @@ export default class DocusaurusAdmonitionsPlugin extends Plugin {
 					content.push(paragraphs[j]);
 				}
 			}
-			if (endIndex === -1) continue;
+			//if (endIndex === -1) continue;
 
 			if (!this.settings.enabledAdmonitions[multiType as keyof DocusaurusAdmonitionSettings['enabledAdmonitions']]) {
 				continue;
